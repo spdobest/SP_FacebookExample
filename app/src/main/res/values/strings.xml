@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">SP_FacebookExample</string>
+    <string name="google_server_client_id">asd</string>
 </resources>
