@@ -23,6 +23,7 @@ import com.facebook.GraphRequestAsyncTask;
 import com.facebook.GraphResponse;
 import com.facebook.HttpMethod;
 import com.facebook.appevents.AppEventsLogger;
+
 import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 import com.facebook.login.widget.LoginButton;
@@ -30,6 +31,7 @@ import com.facebook.share.model.SharePhoto;
 import com.facebook.share.model.SharePhotoContent;
 import com.facebook.share.model.ShareVideo;
 import com.facebook.share.model.ShareVideoContent;
+import com.google.android.gms.cast.framework.Session;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -58,6 +60,8 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
     String img_path = null;
     File imageFile;
 
+    AccessToken accessTokenFb = null;
+
     Uri imageUri;
 
     @Override
@@ -76,6 +80,11 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         LoginButton loginButton = (LoginButton) findViewById(R.id.login_button);
         loginButton.setReadPermissions("user_friends");
         getLoginDetails(loginButton);
+
+        if(accessTokenFb!=null){
+            getMyFbFriends();
+        }
+
     }
 
     /*
@@ -87,13 +96,13 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
         login_button.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
             @Override
             public void onSuccess(LoginResult login_result) {
-
+                accessTokenFb = login_result.getAccessToken();
                 String userId = login_result.getAccessToken().getUserId();
 
+//                getFriendList(login_result.getAccessToken());
 
-
-                getFriendsList(userId);
-
+//                getFriendsList(userId);
+                getMyFbFriends();
 
                /*GraphRequestAsyncTask graphRequestAsyncTask = new GraphRequest(
                         login_result.getAccessToken(),
@@ -253,5 +262,73 @@ public class MainActivity extends AppCompatActivity implements View.OnClickListe
                 .addPhoto(photo)
                 .build();
     }
+private void getFriendList(final AccessToken token){
+    GraphRequest graphRequest = GraphRequest.newMeRequest(token, new GraphRequest.GraphJSONObjectCallback() {
+        @Override
+        public void onCompleted(JSONObject jsonObject, GraphResponse graphResponse) {
+            try {
+                JSONArray jsonArrayFriends = jsonObject.getJSONObject("friendlist").getJSONArray("data");
+                JSONObject friendlistObject = jsonArrayFriends.getJSONObject(0);
+                String frienListID = friendlistObject.getString("id");
+                myNewGraphReq(frienListID);
 
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+        }
+    });
+    Bundle param = new Bundle();
+//    param.putString("fields", "friendlist,members");
+    param.putString("fields", "friendlist, name, picture");
+    graphRequest.setParameters(param);
+    graphRequest.executeAsync();
+}
+    private void myNewGraphReq(String friendlistId) {
+        final String graphPath = "/"+friendlistId+"/members/";
+        AccessToken token = AccessToken.getCurrentAccessToken();
+        GraphRequest request = new GraphRequest(token, graphPath, null, HttpMethod.GET, new GraphRequest.Callback() {
+            @Override
+            public void onCompleted(GraphResponse graphResponse) {
+                JSONObject object = graphResponse.getJSONObject();
+                try {
+                    JSONArray arrayOfUsersInFriendList= object.getJSONArray("data");
+                /* Do something with the user list */
+                /* ex: get first user in list, "name" */
+                    JSONObject user = arrayOfUsersInFriendList.getJSONObject(0);
+                    String usersName = user.getString("name");
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+        });
+        Bundle param = new Bundle();
+        param.putString("fields", "name");
+        request.setParameters(param);
+        request.executeAsync();
+    }
+
+    private void getMyFbFriends(){
+
+        // "/me/taggable_friends"
+
+        new GraphRequest(
+                AccessToken.getCurrentAccessToken(),
+                "/me/taggable_friends",
+                null,
+                HttpMethod.GET,
+                new GraphRequest.Callback() {
+                    public void onCompleted(GraphResponse response) {
+                        Log.e("getFriendsDat",""+ response);
+                        Intent intent = new Intent(MainActivity.this,FriendsList.class);
+                        try {
+                            JSONArray rawName = response.getJSONObject().getJSONArray("data");
+                            intent.putExtra("jsondata", rawName.toString());
+                            startActivity(intent);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                    }
+                }
+        ).executeAsync();
+    }
 }
